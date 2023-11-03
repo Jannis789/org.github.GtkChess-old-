@@ -1,0 +1,6 @@
+data/org.github.GtkChess.desktop.in
+data/org.github.GtkChess.appdata.xml.in
+data/org.github.GtkChess.gschema.xml
+src/main.js
+src/window.js
+src/window.ui

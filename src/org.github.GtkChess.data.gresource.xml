@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/org/github/GtkChess">
+    <file preprocess="xml-stripblanks">window.ui</file>
+    <file preprocess="xml-stripblanks">gtk/help-overlay.ui</file>
+    <file>style.css</file>
+    <file>img/black_pawn.svg</file>
+    <file>img/black_rook.svg</file>
+    <file>img/black_knight.svg</file>
+    <file>img/black_bishop.svg</file>
+    <file>img/black_queen.svg</file>
+    <file>img/black_king.svg</file>
+    <file>img/white_pawn.svg</file>
+    <file>img/white_rook.svg</file>
+    <file>img/white_knight.svg</file>
+    <file>img/white_bishop.svg</file>
+    <file>img/white_queen.svg</file>
+    <file>img/white_king.svg</file>
+  </gresource>
+</gresources>

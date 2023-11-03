@@ -1,0 +1,22 @@
+.white-button {
+    background-color: #f0d9b5;
+    color: white;
+}
+.black-button {
+    background-color: #b58863;
+    color: black;
+}
+.black-button, .white-button {
+    border-radius: 0;
+        -webkit-box-shadow: inset 0px 0px 2em 36px rgba(10, 10, 10,0.05);
+    box-shadow: inset 0px 0px 2em 36px rgba(10, 10, 10,0.05);
+}
+.black-button:active, .white-button:active {
+    -webkit-box-shadow: inset 0px 0px 2em 36px rgba(230, 74, 25,0.35);
+    box-shadow: inset 0px 0px 2em 36px rgba(230, 74, 25,0.35);
+    border-radius: 0;
+}
+.possible-position {
+    -webkit-box-shadow: inset 0px 0px 2em 36px rgba(230, 74, 25,0.35);
+    box-shadow: inset 0px 0px 2em 36px rgba(230, 74, 25,0.35);
+}
