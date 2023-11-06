@@ -9,20 +9,39 @@ import {
     queen
 } from './pieces.js';
 
-export const chessBoard = [
-    ["r", "n", "b", "q", "k", "b", "n", "r"],
-    ["p", "p", "p", "p", "p", "p", "p", "p"],
-    [null, null, null, null, null, null, null, null],
-    [null, null, null, null, null, null, null, null],
-    [null, null, null, null, null, null, null, null],
-    [null, null, null, null, null, null, null, null],
-    ['P', "P", "P", null, "P", "P", "P", "P"],
-    ["R", "N", "B", "Q", "K", "B", "N", "R"]
+export let chessBoard = [
+    ["r", "p", null, null, null, null, "P", "R"],
+    ["n", "p", null, null, null, null, "P", "N"],
+    ["b", "p", null, null, null, null, "P", "B"],
+    ["q", "p", null, null, null, null, "P", "Q"],
+    ["k", "p", null, null, null, null, "P", "K"],
+    ["b", "p", null, null, null, null, "P", "B"],
+    ['n', "p", null, null, null, null, "P", "N"],
+    ["r", "p", null, null, null, null, "P", "R"]
 ];
+
 const validPieceCharacters = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const numSize = validPieceCharacters.length;
 const cssProvider = new Gtk.CssProvider();
 const buttons = [];
+
+
+export function printGameBoard() {
+    for (let y = 0; y < 8; y++) {
+      let rowString = '';
+      for (let x = 0; x < 8; x++) {
+        const piece = chessBoard[x][y];
+        const symbol = piece !== null ? piece : ' ';
+        rowString += ' ' + symbol + ' ';
+      }
+      console.log(rowString);
+    }
+  }
+
+export function updateChessBoard(row, cell, piece) {
+    delete chessBoard[row][cell];
+    chessBoard[row][cell] = piece;
+}
 
 export function fetchTile(x, y) {
     return buttons[x][y];
@@ -68,33 +87,33 @@ class GameBoard {
      * @return {none} - This function does not return a value.
      */
     initPieces() {
-        for (let y = 0; y < chessBoard.length; y++) {
-            for (let x = 0; x < chessBoard[y].length; x++) {
-                const piece = chessBoard[y][x];
-                if (piece !== null) {
-                    switch (piece.toLowerCase()) {
-                        case 'p':
-                            new pawn(piece, x, y);
-                            break;
-                        case 'r':
-                            new rook(piece, x, y);
-                            break;
-                        case 'n':
-                            new knight(piece, x, y);
-                            break;
-                        case 'b':
-                            new bishop(piece, x, y);
-                            break;
-                        case 'k':
-                            new king(piece, x, y);
-                            break;
-                        case 'q':
-                            new queen(piece, x, y);
-                            break;
-                    }
-                }
+        for (let x = 0; x < chessBoard.length; x++) {
+            for (let y = 0; y < chessBoard[x].length; y++) {
+                const piece = chessBoard[x][y];
+                createPiece(piece, x, y);
             }
         }
+    }
+}
+
+export function createPiece(piece, x, y) {
+    if (piece !== null) {
+        switch (piece.toLowerCase()) {
+            case 'p':
+                return new pawn(piece, x, y);
+            case 'r':
+                return new rook(piece, x, y);
+            case 'n':
+                return new knight(piece, x, y);
+            case 'b':
+                return new bishop(piece, x, y);
+            case 'k':
+                return new king(piece, x, y);
+            case 'q':
+                return new queen(piece, x, y);
+        }
+    } else {
+        return null;
     }
 }
 
