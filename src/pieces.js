@@ -23,7 +23,7 @@ let isWhitesTurn = true;
 function checkCheck(validMoves) {
     // If true is returned, the King shall be protected or moved
     const enemyKing = isWhitesTurn ? blackKing : whiteKing; // reference to the enemy King
-    if (validMoves.some(([x,y]) => x === enemyKing[0] && y === enemyKing[1])) {
+    if (validMoves.some(([x, y]) => x === enemyKing[0] && y === enemyKing[1])) {
         console.log('Check!');
         return true;
     }
@@ -36,12 +36,41 @@ function forceToProtect(possibleMoves, x, y) {
 
 }
 
+function isGuardedPiece(x, y) {
+    let isGuarded = false;
+
+    getPiece(x, y).changeTeam;
+
+    const allPieces = Object.values(pieces).flat();
+    for (let i = 0; i < allPieces.length; i++) {
+        const piece = allPieces[i];
+        if (piece && piece.isWhitePiece !== isWhitesTurn) {
+            let enemyValidMoves = [];
+            if (piece.pieceType.toLowerCase() === 'p') {
+                enemyValidMoves = piece.attackPositions;
+            } else {
+                enemyValidMoves = piece.getValidMoves;
+            }
+            if (enemyValidMoves.some(([enemyValidX, enemyValidY]) => enemyValidX === x && enemyValidY === y)) {
+                isGuarded = true;
+                break;
+            }
+        }
+    }
+
+    getPiece(x, y).changeTeam;
+
+    return isGuarded;
+}
+
 function getPiece(x, y) {
     return pieces[x]?.[y];
 }
+
 function deletePiece(x, y) {
     delete pieces[x]?.[y];
 }
+
 function definePiece(object, x, y) {
     pieces[x] = pieces[x] || [];
     pieces[x][y] = object;
@@ -57,14 +86,20 @@ class piece {
         this.isWhitePiece = pieceType === pieceType.toUpperCase() ? true : false;
     }
     moveTo(newX, newY) {
-        if (newX === this.x && newY === this.y) {
+        const {
+            pieceType,
+            x,
+            y,
+            isWhitePiece
+        } = this;
+        if (newX === x && newY === y) {
             return false;
         }
-        updateChessBoard(this.x, this.y, null);
-        updateChessBoard(newX, newY, this.pieceType);
-        initPiece(null, this.x, this.y);
+        updateChessBoard(x, y, null);
+        updateChessBoard(newX, newY, pieceType);
+        initPiece(null, x, y);
         deletePiece(newX, newY);
-        deletePiece(this.x, this.y);
+        deletePiece(x, y);
         console.log('------------------------------------------------');
         console.log('Piece: ' + this.pieceType + ' will be moved from: ' + this.x + '|' + this.y + ' to: ' + newX + '|' + newY);
         console.log('------------------------------------------------');
@@ -72,62 +107,85 @@ class piece {
         this.x = newX;
         this.y = newY;
         definePiece(this, newX, newY);
-        initPiece(this.pieceType, newX, newY);
+        initPiece(pieceType, newX, newY);
         return true;
+    }
+    get changeTeam() {
+        this.isWhitePiece = !this.isWhitePiece;
     }
 }
 
 export class pawn extends piece {
     constructor(pieceType, x, y) {
         super(pieceType, x, y);
+        const isWhitePiece = pieceType === pieceType.toUpperCase() ? true : false;
+        this.capturePositions = isWhitePiece ? [
+            [-1, -1],
+            [1, -1]
+        ] : [
+            [1, 1],
+            [-1, 1]
+        ];
     }
 
     get getValidMoves() {
-        const {isWhitePiece} = this;
+        const {
+            x,
+            y,
+            isWhitePiece,
+            capturePositions
+        } = this;
         const validMoves = [];
         const offsetY = isWhitePiece ? -1 : 1;
         // Check regular position
-        if (getPiece(this.x, this.y + offsetY) === undefined) {
-            validMoves.push([this.x, this.y + offsetY]);
+        if (getPiece(x, y + offsetY) === undefined) {
+            validMoves.push([x, y + offsetY]);
             // Check if there is no figure at the starting position
             // Check if the Y-coordinate for white is 6 or if the Y-coordinate for black is 1.
             if (
-                getPiece(this.x, this.y + offsetY * 2) === undefined &&
-                ((this.y === 6 && isWhitePiece) || (this.y === 1 && !isWhitePiece))
+                !getPiece(x, y + offsetY * 2) &&
+                ((y === 6 && isWhitePiece) || (y === 1 && !isWhitePiece))
             ) {
-                validMoves.push([this.x, this.y + offsetY * 2]);
+                validMoves.push([x, y + offsetY * 2]);
             }
         }
         // Check capture positions
-		let filteredHittablePositions = [];
-        const capturePositions = isWhitePiece ? [
-			[-1, -1],
-			[1, -1]
-		] : [
-			[1, 1],
-			[-1, 1]
-		];
         for (const [captureX, captureY] of capturePositions) {
-            const opponent = getPiece(this.x + captureX, this.y + captureY);
+            const opponent = getPiece(x + captureX, y + captureY);
             if (opponent && isWhitePiece !== opponent.isWhitePiece) {
-				filteredHittablePositions.push([this.x + captureX, this.y + captureY]);
-                validMoves.push([this.x + captureX, this.y + captureY]);
-                
+                validMoves.push([x + captureX, y + captureY]);
+
             }
         }
         return validMoves;
     }
+    get attackPositions() {
+        const {
+            x,
+            y,
+            isWhitePiece,
+            capturePositions
+        } = this;
+        const validMoves = [];
+        for (const [captureX, captureY] of capturePositions) {
+            validMoves.push([x + captureX, y + captureY]);
+        }
+
+        return validMoves;
+
+    }
 }
+
 
 export class rook extends piece {
     constructor(pieceType, x, y) {
         super(pieceType, x, y);
         const movementPattern = [
-			[0, 1],
-			[-1, 0],
-			[1, 0],
-			[0, -1],
-		];
+            [0, 1],
+            [-1, 0],
+            [1, 0],
+            [0, -1],
+        ];
         this.movementPattern = movementPattern;
     }
     get getValidMoves() {
@@ -138,7 +196,7 @@ export class rook extends piece {
             movementPattern
         } = this;
         const validMoves = getValidMoves(isWhitePiece, x, y, movementPattern);
-        
+
         return validMoves;
     }
 }
@@ -147,29 +205,34 @@ export class knight extends piece {
     constructor(pieceType, x, y) {
         super(pieceType, x, y);
         const movementPattern = [
-			[-2, 1],
-			[-1, 2],
-			[1, 2],
-			[2, 1],
-			[2, -1],
-			[1, -2],
-			[-1, -2],
-			[-2, -1]
-		];
+            [-2, 1],
+            [-1, 2],
+            [1, 2],
+            [2, 1],
+            [2, -1],
+            [1, -2],
+            [-1, -2],
+            [-2, -1]
+        ];
         this.movementPattern = movementPattern;
     }
     get getValidMoves() {
-        const { isWhitePiece } = this;
+        const {
+            isWhitePiece,
+            x,
+            y,
+            movementPattern
+        } = this;
         const validMoves = [];
-        for (const [xOffset, yOffset] of this.movementPattern) {
-            const [newX, newY] = [this.x + xOffset, this.y + yOffset];
+        for (const [xOffset, yOffset] of movementPattern) {
+            const [newX, newY] = [x + xOffset, y + yOffset];
             const newPiece = getPiece(newX, newY);
             const outOfBounds = newX < 0 || newX > 7 || newY < 0 || newY > 7;
             if (!outOfBounds && (!newPiece || newPiece.isWhitePiece !== isWhitePiece)) {
                 validMoves.push([newX, newY]);
             }
         }
-        
+
         return validMoves;
     }
 }
@@ -178,11 +241,11 @@ export class bishop extends piece {
     constructor(pieceType, x, y) {
         super(pieceType, x, y);
         const movementPattern = [
-			[-1, 1],
-			[1, 1],
-			[-1, -1],
-			[1, -1]
-		];
+            [-1, 1],
+            [1, 1],
+            [-1, -1],
+            [1, -1]
+        ];
         this.movementPattern = movementPattern;
     }
     get getValidMoves() {
@@ -193,7 +256,7 @@ export class bishop extends piece {
             movementPattern
         } = this;
         const validMoves = getValidMoves(isWhitePiece, x, y, movementPattern);
-        
+
         return validMoves;
     }
 }
@@ -202,18 +265,23 @@ export class queen extends piece {
     constructor(pieceType, x, y) {
         super(pieceType, x, y);
         this.movementPattern = [
-			[-1, 1],
-			[0, 1],
-			[1, 1],
-			[-1, 0],
-			[1, 0],
-			[-1, -1],
-			[0, -1],
-			[1, -1]
-		];
+            [-1, 1],
+            [0, 1],
+            [1, 1],
+            [-1, 0],
+            [1, 0],
+            [-1, -1],
+            [0, -1],
+            [1, -1]
+        ];
     }
     get getValidMoves() {
-        const { x, y, isWhitePiece, movementPattern } = this;
+        const {
+            x,
+            y,
+            isWhitePiece,
+            movementPattern
+        } = this;
         const validMoves = getValidMoves(isWhitePiece, x, y, movementPattern);
         return validMoves;
     }
@@ -223,53 +291,55 @@ export class king extends piece {
     constructor(pieceType, x, y) {
         super(pieceType, x, y);
         const movementPattern = [
-			[-1, 1],
-			[0, 1],
-			[1, 1],
-			[-1, 0],
-			[1, 0],
-			[-1, -1],
-			[0, -1],
-			[1, -1]
-		];
+            [-1, 1],
+            [0, 1],
+            [1, 1],
+            [-1, 0],
+            [1, 0],
+            [-1, -1],
+            [0, -1],
+            [1, -1]
+        ];
         this.movementPattern = movementPattern;
         if (pieceType === 'K') {
-			      whiteKing = [this.x, this.y];
-		    }
-		    if (pieceType === 'k') {
-			      blackKing = [this.x, this.y];
-		    }
+            whiteKing = [this.x, this.y];
+        }
+        if (pieceType === 'k') {
+            blackKing = [this.x, this.y];
+        }
     }
 
     get getValidMoves() {
-        const {isWhitePiece} = this;
+        const {
+            x,
+            y,
+            isWhitePiece,
+            movementPattern
+        } = this;
         // Create an array to store valid moves
-        const validMoves = [];
-
-        // Get the current x and y coordinates of the piece
-        const [x, y] = [this.x, this.y];
+        const legalMoves = [];
 
         // Iterate through each offset in the movement pattern of the piece
-        for (const [xOffset, yOffset] of this.movementPattern) {
+        for (const [xOffset, yOffset] of movementPattern) {
             // Calculate the new x and y coordinates based on the offset
             const [newX, newY] = [x + xOffset, y + yOffset];
 
             // Get the piece at the new coordinates
             const newPiece = getPiece(newX, newY);
-            
+
             // Check if the new coordinates are out of bounds
             const outOfBounds = newX < 0 || newX > 7 || newY < 0 || newY > 7;
 
             // Check if the new coordinates are empty or contain an opponent's piece
             if (!outOfBounds && (!newPiece || newPiece.isWhitePiece !== isWhitePiece)) {
                 // Add the valid move to the array
-                validMoves.push([newX, newY]);
+                legalMoves.push([newX, newY]);
             }
         }
 
         // Get all values from pieces and flaten it
         const allPieces = Object.values(pieces).flat();
-
+        const illegalMoves = [];
         // Iterate through each piece
         for (let i = 0; i < allPieces.length; i++) {
             // Get the current piece
@@ -278,24 +348,41 @@ export class king extends piece {
             // Check if the piece exists and is not the same color as the current piece and is not a king
             if (piece && piece.isWhitePiece !== isWhitePiece && piece.pieceType.toLowerCase() !== 'k') {
                 // Get the valid moves of the opponent piece
-                const enemyValidMoves = piece.getValidMoves;
+                let enemyValidMoves = [];
+                if (piece.pieceType.toLowerCase() === 'p') {
+                    enemyValidMoves = piece.attackPositions;
+                } else {
+                    enemyValidMoves = piece.getValidMoves;
+                }
 
                 // Iterate through each valid move of the current current ValidPieces
-                for (const [x, y] of validMoves) {
+                for (const [x, y] of legalMoves) {
                     // Check if the opponent's valid moves include the current move
                     if (enemyValidMoves.some(([enemyX, enemyY]) => enemyX === x && enemyY === y)) {
-                        // Remove the move from the validMoves array
-                        return validMoves.filter(([previousX, previousY]) => previousX !== x && previousY !== y);
+                        illegalMoves.push([x, y]);
+                    }
+                    if (getPiece(x, y)) {
+                        if (isGuardedPiece(x, y)) {
+                            illegalMoves.push([x, y]);
+                        }
                     }
                 }
             }
         }
 
-        // Return the array of valid moves
+        // If no IllegalMove In array IllegalMoves return only legal Moves
+        if (!illegalMoves) {
+            return legalMoves;
+        }
+        const filteredMoves = [];
 
-        // can't attack the king, needs new function
-
-        return validMoves;
+        for (const legalMove of legalMoves) {
+            // If illegalMove is eqval to an legalMove dont meet the condition
+            if (!illegalMoves.some(illegalMove => legalMove[0] === illegalMove[0] && legalMove[1] === illegalMove[1])) {
+                filteredMoves.push(legalMove);
+            }
+        }
+        return filteredMoves;
     }
 }
 
@@ -360,7 +447,7 @@ function performMove(x, y) {
     if (previousMoves.some(([selectedX, selectedY]) => selectedX === x && selectedY === y)) {
         previousPiece.moveTo(x, y);
         if (checkCheck(getPiece(x, y).getValidMoves)) {
-            
+
         }
         unselectMoves(previousMoves);
         isWhitesTurn = !isWhitesTurn;
