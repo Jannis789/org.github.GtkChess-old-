@@ -36,6 +36,7 @@ function forceToProtect(possibleMoves, x, y) {
 
 }
 
+// Determines if a piece at the specified position is guarded by a enemy pieces.
 function isGuardedPiece(x, y) {
     let isGuarded = false;
 
@@ -45,16 +46,8 @@ function isGuardedPiece(x, y) {
     for (let i = 0; i < allPieces.length; i++) {
         const piece = allPieces[i];
         if (piece && piece.isWhitePiece !== isWhitesTurn) {
-            let enemyValidMoves = [];
-            if (piece.pieceType.toLowerCase() === 'p') {
-                enemyValidMoves = piece.attackPositions;
-            } else {
-                enemyValidMoves = piece.getValidMoves;
-            }
-            if (enemyValidMoves.some(([enemyValidX, enemyValidY]) => enemyValidX === x && enemyValidY === y)) {
-                isGuarded = true;
-                break;
-            }
+            const enemyValidMoves = piece.pieceType.toLowerCase() === 'p' ? piece.attackPositions : piece.getValidMoves;
+            isGuarded = enemyValidMoves.some(([enemyValidX, enemyValidY]) => enemyValidX === x && enemyValidY === y) || isGuarded;
         }
     }
 
@@ -76,7 +69,7 @@ function definePiece(object, x, y) {
     pieces[x][y] = object;
 }
 
-class piece {
+class piece { // Base class for every Chess Piece
     constructor(pieceType, x, y) {
         this.pieceType = pieceType;
         this.x = x;
@@ -316,77 +309,60 @@ export class king extends piece {
             isWhitePiece,
             movementPattern
         } = this;
-        // Create an array to store valid moves
+
         const legalMoves = [];
 
-        // Iterate through each offset in the movement pattern of the piece
         for (const [xOffset, yOffset] of movementPattern) {
-            // Calculate the new x and y coordinates based on the offset
+
             const [newX, newY] = [x + xOffset, y + yOffset];
-
-            // Get the piece at the new coordinates
             const newPiece = getPiece(newX, newY);
-
-            // Check if the new coordinates are out of bounds
             const outOfBounds = newX < 0 || newX > 7 || newY < 0 || newY > 7;
 
-            // Check if the new coordinates are empty or contain an opponent's piece
             if (!outOfBounds && (!newPiece || newPiece.isWhitePiece !== isWhitePiece)) {
-                // Add the valid move to the array
                 legalMoves.push([newX, newY]);
             }
+
         }
+        
+        // prevent king from moving into check by calulating all possible Moves from the enemy
+        const illegalMoves = []; 
+        Object.values(pieces).flat().flatMap(piece => {
 
-        // Get all values from pieces and flaten it
-        const allPieces = Object.values(pieces).flat();
-        const illegalMoves = [];
-        // Iterate through each piece
-        for (let i = 0; i < allPieces.length; i++) {
-            // Get the current piece
-            const piece = allPieces[i];
-
-            // Check if the piece exists and is not the same color as the current piece and is not a king
             if (piece && piece.isWhitePiece !== isWhitePiece && piece.pieceType.toLowerCase() !== 'k') {
-                // Get the valid moves of the opponent piece
-                let enemyValidMoves = [];
-                if (piece.pieceType.toLowerCase() === 'p') {
-                    enemyValidMoves = piece.attackPositions;
-                } else {
-                    enemyValidMoves = piece.getValidMoves;
-                }
 
-                // Iterate through each valid move of the current current ValidPieces
+                const enemyValidMoves = piece.pieceType.toLowerCase() === 'p' ? piece.attackPositions : piece.getValidMoves;
+
                 for (const [x, y] of legalMoves) {
-                    // Check if the opponent's valid moves include the current move
-                    if (enemyValidMoves.some(([enemyX, enemyY]) => enemyX === x && enemyY === y)) {
+
+                    if ( // x and y is the possible move of the King
+                         // enemyX and enemyY is the possible move of the threatining pieces
+                        enemyValidMoves.some(([enemyX, enemyY]) => enemyX === x && enemyY === y) || // Add an illegal position if the king can be attacked or
+                        (getPiece(x, y) && isGuardedPiece(x, y))                                    // if a piece attacked by the king is guarded.
+
+                    ) {
                         illegalMoves.push([x, y]);
-                    }
-                    if (getPiece(x, y)) {
-                        if (isGuardedPiece(x, y)) {
-                            illegalMoves.push([x, y]);
-                        }
                     }
                 }
             }
-        }
-
-        // If no IllegalMove In array IllegalMoves return only legal Moves
+        
+        });
+        // If no illegal move is encountered, return the legal moves
         if (!illegalMoves) {
             return legalMoves;
         }
         const filteredMoves = [];
 
-        for (const legalMove of legalMoves) {
-            // If illegalMove is eqval to an legalMove dont meet the condition
-            if (!illegalMoves.some(illegalMove => legalMove[0] === illegalMove[0] && legalMove[1] === illegalMove[1])) {
-                filteredMoves.push(legalMove);
+        for (const [x,y] of legalMoves) {
+            // If illegal moves matches legal moves, they won't be added to the final array
+            if (!illegalMoves.some( ([illegalX, illegalY]) => x === illegalX && y === illegalY)) {
+                filteredMoves.push([x,y]);
             }
         }
         return filteredMoves;
     }
 }
 
-function initPiece(pieceType, x, y) { // refactored
+function initPiece(pieceType, x, y) {
     const button = fetchTile(x, y);
     if (pieceType === null) {
         button.set_child(null);
@@ -426,6 +402,11 @@ function getValidMoves(isWhitePiece, x, y, movementPattern) {
     return validMoves;
 }
 
+/** 
+ * positionCallback is a callback object with a Function,
+ * the function handleChessPiece will be triggered every time a chess tile is clicked.
+ */
+
 const positionCallback = {
     handleChessPiece: function(x, y) {
         performMove(x, y);
@@ -437,6 +418,7 @@ let previousPiece = [];
 
 function performMove(x, y) {
     const piece = getPiece(x, y);
+    // if a piece is encountered
     if (piece && piece.isWhitePiece === isWhitesTurn) {
         const selectedMoves = piece.getValidMoves;
         previousPiece = piece;
@@ -444,10 +426,13 @@ function performMove(x, y) {
         selectValidMoves(selectedMoves);
         previousMoves = selectedMoves;
     }
+    // if a selected tile is encountered
     if (previousMoves.some(([selectedX, selectedY]) => selectedX === x && selectedY === y)) {
         previousPiece.moveTo(x, y);
+        // if a check is encountered
         if (checkCheck(getPiece(x, y).getValidMoves)) {
-
+            // force King to move
+            forceToProtect(getPiece(x, y).getValidMoves, x, y);
         }
         unselectMoves(previousMoves);
         isWhitesTurn = !isWhitesTurn;

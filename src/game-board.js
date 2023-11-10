@@ -13,9 +13,9 @@ export let chessBoard = [
     ["r", "p", null, null, null, null, "P", "R"],
     ["n", "p", null, null, null, null, "P", "N"],
     ["b", "p", null, null, null, null, "P", "B"],
-    ["q", "p", null, null, null, "r", "b", null],
-    ["k", "p", null, null, null, null, null, "K"],
-    ["b", "p", null, null, null, "p", null, "B"],
+    ["q", "p", null, null, null, null, "P", "Q"],
+    ["k", "p", null, null, null, null, "P", "K"],
+    ["b", "p", null, null, null, null, "P", "B"],
     ['n', "p", null, null, null, null, "P", "N"],
     ["r", "p", null, null, null, null, "P", "R"]
 ];
