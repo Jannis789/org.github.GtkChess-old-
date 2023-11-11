@@ -21,8 +21,8 @@ const pieces = {};
 let isWhitesTurn = true;
 
 function checkCheck(validMoves) {
-    // If true is returned, the King shall be protected or moved
-    const enemyKing = isWhitesTurn ? blackKing : whiteKing; // reference to the enemy King
+    // Checks if the valid moves threaten the enemy King.
+    const enemyKing = isWhitesTurn ? blackKing : whiteKing; // reference to the enemy King, because the Turn isn't over yet
     if (validMoves.some(([x, y]) => x === enemyKing[0] && y === enemyKing[1])) {
         console.log('Check!');
         return true;
@@ -30,10 +30,32 @@ function checkCheck(validMoves) {
     return false;
 }
 
-function forceToProtect(possibleMoves, x, y) {
-    // function shall be calculate the moves which can block the attack
-    // Or King shall be moved to a save Position
+let protectableMoves = [];
 
+function forceToProtect(x, y) {
+    // should add all the possible moves to the protectableMoves array, if they're protecting the king
+    // reference to the enemy King, because the Turn isn't over yet
+    // but it will notice if the king is in check in the next round 
+    const enemyKing = isWhitesTurn ? blackKing : whiteKing; 
+    const validMovesWhileInCheck = [];
+    
+    let offsetMultiplier = 1;
+    while (true) {
+        const newX = Math.sign(x - enemyKing[0]) * offsetMultiplier + enemyKing[0];
+        const newY = Math.sign(y - enemyKing[1]) * offsetMultiplier + enemyKing[1];
+        
+        const outOfBounds = newX < 0 || newX > 7 || newY < 0 || newY > 7;
+        validMovesWhileInCheck.push([newX, newY]);
+        
+        if (outOfBounds || (newX === x && newY === y)) {
+            break;
+        }
+        
+        offsetMultiplier++;
+    }
+    if (validMovesWhileInCheck) {
+        protectableMoves = validMovesWhileInCheck;
+    }
 }
 
 // Determines if a piece at the specified position is guarded by a enemy pieces.
@@ -46,7 +68,7 @@ function isGuardedPiece(x, y) {
     for (let i = 0; i < allPieces.length; i++) {
         const piece = allPieces[i];
         if (piece && piece.isWhitePiece !== isWhitesTurn) {
-            const enemyValidMoves = piece.pieceType.toLowerCase() === 'p' ? piece.attackPositions : piece.getValidMoves;
+            const enemyValidMoves = piece.pieceType.toLowerCase() === 'p' ? piece.attackPositions : piece.possibleMoves;
             isGuarded = enemyValidMoves.some(([enemyValidX, enemyValidY]) => enemyValidX === x && enemyValidY === y) || isGuarded;
         }
     }
@@ -88,6 +110,7 @@ class piece { // Base class for every Chess Piece
         if (newX === x && newY === y) {
             return false;
         }
+        protectableMoves.length = 0;
         updateChessBoard(x, y, null);
         updateChessBoard(newX, newY, pieceType);
         initPiece(null, x, y);
@@ -121,7 +144,7 @@ export class pawn extends piece {
         ];
     }
 
-    get getValidMoves() {
+    get possibleMoves() {
         const {
             x,
             y,
@@ -181,14 +204,14 @@ export class rook extends piece {
         ];
         this.movementPattern = movementPattern;
     }
-    get getValidMoves() {
+    get possibleMoves() {
         const {
             isWhitePiece,
             x,
             y,
             movementPattern
         } = this;
-        const validMoves = getValidMoves(isWhitePiece, x, y, movementPattern);
+        const validMoves = getPossibleMoves(isWhitePiece, x, y, movementPattern);
 
         return validMoves;
     }
@@ -209,7 +232,7 @@ export class knight extends piece {
         ];
         this.movementPattern = movementPattern;
     }
-    get getValidMoves() {
+    get possibleMoves() {
         const {
             isWhitePiece,
             x,
@@ -241,14 +264,14 @@ export class bishop extends piece {
         ];
         this.movementPattern = movementPattern;
     }
-    get getValidMoves() {
+    get possibleMoves() {
         const {
             x,
             y,
             isWhitePiece,
             movementPattern
         } = this;
-        const validMoves = getValidMoves(isWhitePiece, x, y, movementPattern);
+        const validMoves = getPossibleMoves(isWhitePiece, x, y, movementPattern);
 
         return validMoves;
     }
@@ -268,14 +291,14 @@ export class queen extends piece {
             [1, -1]
         ];
     }
-    get getValidMoves() {
+    get possibleMoves() {
         const {
             x,
             y,
             isWhitePiece,
             movementPattern
         } = this;
-        const validMoves = getValidMoves(isWhitePiece, x, y, movementPattern);
+        const validMoves = getPossibleMoves(isWhitePiece, x, y, movementPattern);
         return validMoves;
     }
 }
@@ -302,7 +325,7 @@ export class king extends piece {
         }
     }
 
-    get getValidMoves() {
+    get possibleMoves() {
         const {
             x,
             y,
@@ -324,18 +347,18 @@ export class king extends piece {
 
         }
         
-        // prevent king from moving into check by calulating all possible Moves from the enemy
+        // prevent king from moving into check by calculating all possible Moves from the enemy
         const illegalMoves = []; 
         Object.values(pieces).flat().flatMap(piece => {
 
             if (piece && piece.isWhitePiece !== isWhitePiece && piece.pieceType.toLowerCase() !== 'k') {
 
-                const enemyValidMoves = piece.pieceType.toLowerCase() === 'p' ? piece.attackPositions : piece.getValidMoves;
+                const enemyValidMoves = piece.pieceType.toLowerCase() === 'p' ? piece.attackPositions : piece.possibleMoves;
 
                 for (const [x, y] of legalMoves) {
 
-                    if ( // x and y is the possible move of the King
-                         // enemyX and enemyY is the possible move of the threatining pieces
+                    if ( // x and y is a possible move of the King
+                         // enemyX and enemyY is a possible move of the threatining pieces
                         enemyValidMoves.some(([enemyX, enemyY]) => enemyX === x && enemyY === y) || // Add an illegal position if the king can be attacked or
                         (getPiece(x, y) && isGuardedPiece(x, y))                                    // if a piece attacked by the king is guarded.
 
@@ -379,7 +402,7 @@ function initPiece(pieceType, x, y) {
     return button;
 }
 
-function getValidMoves(isWhitePiece, x, y, movementPattern) {
+function getPossibleMoves(isWhitePiece, x, y, movementPattern) {
     const validMoves = [];
     for (const [xOffset, yOffset] of movementPattern) {
         let offsetMultiplier = 1;
@@ -416,23 +439,33 @@ const positionCallback = {
 let previousMoves = [];
 let previousPiece = [];
 
+function protectKing(piece, selectedMoves) {
+    if (protectableMoves.length === 0 || piece.pieceType.toLowerCase() === 'k') {
+        return selectedMoves;
+    }
+    
+    return selectedMoves.filter(possibleMove => {
+        return protectableMoves.some(protectableMove => {
+            return possibleMove[0] === protectableMove[0] && possibleMove[1] === protectableMove[1];
+        });
+    });
+}
+
 function performMove(x, y) {
     const piece = getPiece(x, y);
     // if a piece is encountered
     if (piece && piece.isWhitePiece === isWhitesTurn) {
-        const selectedMoves = piece.getValidMoves;
+        let selectedMoves = protectKing(piece, piece.possibleMoves); // If the king Protection isn't needed then it will return the regular possible moves
         previousPiece = piece;
         unselectMoves(previousMoves);
-        selectValidMoves(selectedMoves);
+        selectPossibleMoves(selectedMoves);
         previousMoves = selectedMoves;
     }
-    // if a selected tile is encountered
+    
     if (previousMoves.some(([selectedX, selectedY]) => selectedX === x && selectedY === y)) {
         previousPiece.moveTo(x, y);
-        // if a check is encountered
-        if (checkCheck(getPiece(x, y).getValidMoves)) {
-            // force King to move
-            forceToProtect(getPiece(x, y).getValidMoves, x, y);
+        if (checkCheck(getPiece(x, y).possibleMoves)) {
+            forceToProtect(x, y); // It will trigger the protectKing function in the next Turn
         }
         unselectMoves(previousMoves);
         isWhitesTurn = !isWhitesTurn;
@@ -440,15 +473,15 @@ function performMove(x, y) {
     }
 }
 
-function selectValidMoves(validPositions) {
-    for (const [x, y] of validPositions) {
+function selectPossibleMoves(possiblePositions) {
+    for (const [x, y] of possiblePositions) {
         const buttonContext = fetchTile(x, y).get_style_context();
         buttonContext.add_class('possible-position');
     }
 }
 
-function unselectMoves(positions) {
-    for (const [x, y] of positions) {
+function unselectMoves(previousPosition) {
+    for (const [x, y] of previousPosition) {
         const buttonContext = fetchTile(x, y).get_style_context();
         buttonContext.remove_class('possible-position');
     }
