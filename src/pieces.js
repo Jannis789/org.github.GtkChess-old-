@@ -27,35 +27,37 @@ function checkCheck(checkWhitesKing) {
     Object.values(pieces).flat().forEach(piece => {
         if (piece.isWhitePiece === checkWhitesKing) {
             const enemyValidMoves = piece.possibleMoves;
-            if (enemyValidMoves.some(move => move[0] === enemyKing[0] && move[1] === enemyKing[1])) {
-                isInCheck = true;
+            for (const threatiningPiece of enemyValidMoves) {
+                const tP = threatiningPiece.toString();
+                const eP = enemyKing.toString();
+                if (tP === eP) {
+                    isInCheck = true;
+                }
             }
         }
     });
     return isInCheck;
 }
 
-let protectableMoves = [];
-
 function forceToProtect(x, y) {
     // should add all the possible moves to the protectableMoves array, if they're protecting the king
     // reference to the enemy King, because the Turn isn't over yet
     // but it will notice if the king is in check in the next round 
-    const enemyKing = isWhitesTurn ? blackKing : whiteKing; 
+    const enemyKing = isWhitesTurn ? blackKing : whiteKing;
     const validMovesWhileInCheck = [];
-    
+
     let offsetMultiplier = 1;
     while (true) {
         const newX = Math.sign(x - enemyKing[0]) * offsetMultiplier + enemyKing[0];
         const newY = Math.sign(y - enemyKing[1]) * offsetMultiplier + enemyKing[1];
-        
+
         const outOfBounds = newX < 0 || newX > 7 || newY < 0 || newY > 7;
         validMovesWhileInCheck.push([newX, newY]);
-        
+
         if (outOfBounds || (newX === x && newY === y)) {
             break;
         }
-        
+
         offsetMultiplier++;
     }
     if (validMovesWhileInCheck) {
@@ -114,7 +116,6 @@ class piece { // Base class for every Chess Piece
         if (newX === x && newY === y) {
             return false;
         }
-        protectableMoves.length = 0;
         updateChessBoard(x, y, null);
         updateChessBoard(newX, newY, pieceType);
         initPiece(null, x, y);
@@ -132,27 +133,18 @@ class piece { // Base class for every Chess Piece
     }
     simulateMoveTo(newX, newY) {
         const {
-            pieceType,
             x,
             y
         } = this;
         if (newX === x && newY === y) {
             return false;
         }
-        protectableMoves.length = 0;
-        updateChessBoard(x, y, null);
-        updateChessBoard(newX, newY, pieceType);
-        initPiece(null, x, y);
+
         deletePiece(newX, newY);
         deletePiece(x, y);
-        console.log('------------------------------------------------');
-        console.log('Piece: ' + this.pieceType + ' will be moved from: ' + this.x + '|' + this.y + ' to: ' + newX + '|' + newY);
-        console.log('------------------------------------------------');
-        printGameBoard();
         this.x = newX;
         this.y = newY;
         definePiece(this, newX, newY);
-        initPiece(pieceType, newX, newY);
         return this;
     }
     get changeTeam() {
@@ -219,7 +211,7 @@ export class pawn extends piece {
             const newY = x + captureY;
             const outOfBounds = newX < 0 || newX > 7 || newY < 0 || newY > 7;
             if (!outOfBounds) {
-                    validMoves.push([newX, newY]);
+                validMoves.push([newX, newY]);
             }
         }
         return validMoves;
@@ -381,7 +373,7 @@ export class king extends piece {
             }
 
         }
-        
+
         // prevent king from moving into check by calculating all possible Moves from the enemy
 
         // If no illegal move is encountered, return the legal moves
@@ -443,51 +435,58 @@ const positionCallback = {
 let previousMoves = [];
 let previousPiece = [];
 
-function simulateMove(x,y) {
-    const [startX, startY] = [x,y];
+function movesWhichWontLeadToCheck(x, y) {
+    const [startX, startY] = [x, y];
     const illegalMoves = [];
     const deletedPieces = [];
-    let piece = getPiece(x,y);
+    let piece = getPiece(x, y);
     const possibleMoves = piece.possibleMoves;
-    possibleMoves.forEach(possiblePiece => {
-        if (getPiece(possiblePiece[0],possiblePiece[1]) && getPiece(possiblePiece[0],possiblePiece[1]).isWhitePiece !== isWhitesTurn) {
-            deletedPieces.push(getPiece(possiblePiece[0],possiblePiece[1]));
+
+    for (const [possibleX, possibleY] of possibleMoves) {
+        const targetPiece = getPiece(possibleX, possibleY);
+        if (targetPiece && targetPiece.isWhitePiece !== isWhitesTurn) {
+            deletedPieces.push(targetPiece);
         }
-    });
-    possibleMoves.forEach(([possibleX,possibleY]) => {
+
         piece = piece.simulateMoveTo(possibleX, possibleY);
-        if (checkCheck(!piece.isWhitePiece)) {
+        if (!targetPiece) {
+            for (const deletedPiece of deletedPieces) {
+                initPiece(deletedPiece.pieceType, deletedPiece.x, deletedPiece.y);
+                definePiece(deletedPiece, deletedPiece.x, deletedPiece.y);
+            }
+        }
+        if (checkCheck(!isWhitesTurn)) {
             illegalMoves.push([possibleX, possibleY]);
         }
-    });
+        deletePiece(possibleX, possibleY);
 
-    piece.moveTo(startX,startY);
-    const filteredMoves = [];
-
-    for (const legalMove of possibleMoves) {
-        if (!illegalMoves.some( illegalMove => legalMove[0] === illegalMove[0] && legalMove[1] === legalMove[1])) {
-                filteredMoves.push([legalMove[0], legalMove[1]]);
-        }
     }
+
+    piece.moveTo(startX, startY);
     for (const deletedPiece of deletedPieces) {
-        initPiece(deletedPiece.pieceType, deletedPiece.x,deletedPiece.y);
-        definePiece(deletedPiece,deletedPiece.x,deletedPiece.y);
+        definePiece(deletedPiece, deletedPiece.x, deletedPiece.y);
+        initPiece(deletedPiece.pieceType, deletedPiece.x, deletedPiece.y);
     }
-        return filteredMoves;
-    
+    if (illegalMoves.length === 0) {
+        return possibleMoves;
+    }
+
+    return possibleMoves.filter(legalMove => {
+        return !illegalMoves.some(illegalMove => legalMove[0] === illegalMove[0] && legalMove[1] === illegalMove[1]);
+    });
 }
 
 function performMove(x, y) {
     const piece = getPiece(x, y);
     // if a piece is encountered
     if (piece && piece.isWhitePiece === isWhitesTurn) {
-        let selectedMoves = simulateMove(x,y); // If the king Protection isn't needed then it will return the regular possible moves
+        let selectedMoves = movesWhichWontLeadToCheck(x, y);
         previousPiece = piece;
         unselectMoves(previousMoves);
         selectPossibleMoves(selectedMoves);
         previousMoves = selectedMoves;
     }
-    
+
     if (previousMoves.some(([selectedX, selectedY]) => selectedX === x && selectedY === y)) {
         previousPiece.moveTo(x, y);
         unselectMoves(previousMoves);
