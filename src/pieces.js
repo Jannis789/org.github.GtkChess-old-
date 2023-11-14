@@ -27,14 +27,11 @@ function checkCheck(checkWhitesKing) {
     Object.values(pieces).flat().forEach(piece => {
         if (piece.isWhitePiece === checkWhitesKing) {
             const enemyValidMoves = piece.possibleMoves;
-            for (const threatiningPiece of enemyValidMoves) {
-                const tP = threatiningPiece.toString();
-                const eP = enemyKing.toString();
-                if (tP === eP) {
-                    isInCheck = true;
-                }
-            }
-        }
+            isInCheck = enemyValidMoves.some(threateningPiece => threateningPiece[0] === enemyKing[0] && threateningPiece[1] === enemyKing[1]) || isInCheck;
+            if (isInCheck) {
+                return isInCheck;
+            }                 
+        }   
     });
     return isInCheck;
 }
@@ -447,11 +444,6 @@ function movesWhichWontLeadToCheck(x, y) {
     }
     // sets the selected Piece back to its original position
     piece.simulateMoveTo(startX, startY);
-
-    // if no illegal move is encountered, return the legal moves
-    if (illegalMoves.length === 0) {
-        return possibleMoves;
-    }
 
     // filters illegal moves
     const filteredMoves = possibleMoves.filter(legalMove => {
