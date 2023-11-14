@@ -1,7 +1,7 @@
 {
     "app-id" : "org.github.GtkChess",
     "runtime" : "org.gnome.Platform",
-    "runtime-version" : "45",
+    "runtime-version" : "master",
     "sdk" : "org.gnome.Sdk",
     "command" : "org.github.GtkChess",
     "finish-args" : [

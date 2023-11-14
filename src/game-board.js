@@ -10,11 +10,11 @@ import {
 } from './pieces.js';
 
 export let chessBoard = [
-    ["r", "p", "q", null, null, null, "P", "R"],
+    ["r", "p", null, null, null, null, "P", "R"],
     ["n", "p", null, null, null, null, "P", "N"],
     ["b", "p", null, null, null, null, "P", "B"],
     ["q", "p", null, null, null, null, null, "Q"],
-    ["k", "p", null, null, null, null, "P", "K"],
+    ["k", "p", null, null, "r", null, null, "K"],
     ["b", "p", null, null, null, null, "P", "B"],
     ['n', "p", null, null, null, null, "P", "N"],
     ["r", "p", null, null, null, null, "P", "R"]
