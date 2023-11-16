@@ -28,34 +28,22 @@ function checkCheck(checkWhitesKing) {
         if (piece.isWhitePiece === checkWhitesKing) {
             const enemyValidMoves = piece.possibleMoves;
             isInCheck = enemyValidMoves.some(threateningPiece => threateningPiece[0] === enemyKing[0] && threateningPiece[1] === enemyKing[1]) || isInCheck;
-            if (isInCheck) {
-                return isInCheck;
-            }                 
         }   
     });
     return isInCheck;
 }
 
-function forceToProtect(x, y) {
+function kingIsInCheck(x,y) {
+    let isInCheck = false;
+    const targetedPiece = getPiece(x, y);
 
-}
-
-// Determines if a piece at the specified position is guarded by a enemy pieces.
-function isGuardedPiece(x, y) {
-    let isGuarded = false;
-
-    getPiece(x, y).changeTeam;
-
-    Object.values(pieces).flat().flatMap(piece => {
-        if (piece && piece.isWhitePiece !== isWhitesTurn) {
+    Object.values(pieces).flat().forEach(piece => {
+        if (piece.isWhitePiece !== targetedPiece.isWhitePiece) {
             const enemyValidMoves = piece.pieceType.toLowerCase() === 'p' ? piece.attackPositions : piece.possibleMoves;
-            isGuarded = enemyValidMoves.some(([enemyValidX, enemyValidY]) => enemyValidX === x && enemyValidY === y) || isGuarded;
+            isInCheck = enemyValidMoves.some(threateningPiece => threateningPiece[0] === x && threateningPiece[1] === y) || isInCheck;
         }
     });
-
-    getPiece(x, y).changeTeam;
-
-    return isGuarded;
+    return isInCheck;
 }
 
 function getPiece(x, y) {
@@ -88,9 +76,6 @@ class piece { // Base class for every Chess Piece
             x,
             y
         } = this;
-        if (newX === x && newY === y) {
-            return false;
-        }
         updateChessBoard(x, y, null);
         updateChessBoard(newX, newY, pieceType);
         initPiece(null, x, y);
@@ -108,21 +93,17 @@ class piece { // Base class for every Chess Piece
     }
     simulateMoveTo(newX, newY) {
         const {
+            isWhitePiece,
+            pieceType,
             x,
             y
         } = this;
-        if (newX === x && newY === y) {
-            return false;
-        }
         deletePiece(newX, newY);
         deletePiece(x, y);
         this.x = newX;
         this.y = newY;
         definePiece(this, newX, newY);
         return this;
-    }
-    get changeTeam() {
-        this.isWhitePiece = !this.isWhitePiece;
     }
 }
 
@@ -416,6 +397,7 @@ function movesWhichWontLeadToCheck(x, y) {
     const deletedPieces = [];
     let piece = getPiece(x, y);
     const possibleMoves = piece.possibleMoves;
+    const finalMoves = [];
 
     for (const [possibleX, possibleY] of possibleMoves) {
         // defines the new position of the Piece
@@ -427,42 +409,34 @@ function movesWhichWontLeadToCheck(x, y) {
 
         piece = piece.simulateMoveTo(possibleX, possibleY); // move To a possible Position
 
-        // only restores deleted pieces if piece dont hit an enemy
-        if (!targetPiece) {
+        // You only want to restore the pieces which were hittable if they are not under attack (!targetPiece)
+        // Look, if opponent's piece (which is replaced by the King) is capable of being attacked, it's necessary due to King must be protected at any cost
+        if (!targetPiece || (piece.pieceType.toLowerCase() === 'k' && kingIsInCheck(possibleX, possibleY))) {
             for (const deletedPiece of deletedPieces) {
                 initPiece(deletedPiece.pieceType, deletedPiece.x, deletedPiece.y);
                 definePiece(deletedPiece, deletedPiece.x, deletedPiece.y);
             }
         }
         // if piece leads to check, respectively check mate
-        if (checkCheck(!isWhitesTurn)) {
-            illegalMoves.push([possibleX, possibleY]);
+        if (piece.pieceType.toLowerCase() === 'k' && !kingIsInCheck(possibleX, possibleY)) {
+            finalMoves.push([possibleX, possibleY]);
+        } else if  (!checkCheck(!isWhitesTurn)) {
+            finalMoves.push([possibleX, possibleY]);
         }
         // remove simulated piece
         deletePiece(possibleX, possibleY);
-
     }
+
+
     // sets the selected Piece back to its original position
     piece.simulateMoveTo(startX, startY);
-
-    // filters illegal moves
-    const filteredMoves = possibleMoves.filter(legalMove => {
-        return !illegalMoves.some(illegalMove => legalMove[0] === illegalMove[0] && legalMove[1] === illegalMove[1]);
-    });
 
     // restore all deleted pieces
     for (const deletedPiece of deletedPieces) {
         definePiece(deletedPiece, deletedPiece.x, deletedPiece.y);
         initPiece(deletedPiece.pieceType, deletedPiece.x, deletedPiece.y);
     }
-    // king has no need to protect itself, it needs to doge the enemy so you can enable moves vice versa 
-    if (getPiece(x, y) && getPiece(x, y).pieceType.toLowerCase() === 'k') {
-        return possibleMoves.filter(possibleMove => {
-            return !filteredMoves.some(filteredMove => filteredMove[0] === possibleMove[0] && filteredMove[1] === possibleMove[1]);
-        });
-    }
-    // return the filtered moves which Protect the King if all above conditions are not met
-    return filteredMoves;    
+    return finalMoves;
 }
 
 function performMove(x, y) {
