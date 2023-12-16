@@ -5,12 +5,14 @@ import GdkPixbuf from 'gi://GdkPixbuf';
 import {
     fetchTile,
     updateChessBoard,
-    printGameBoard
-}
+    printGameBoard,
+    kings
+} from './game-board.js';
 
-from './game-board.js';
-let whiteKing = [];
-let blackKing = [];
+
+let isWhitesTurn = true;
+const pieces = {};
+
 const fullPieceTerm = {
     p: 'pawn',
     r: 'rook',
@@ -19,9 +21,6 @@ const fullPieceTerm = {
     q: 'queen',
     k: 'king'
 }
-const pieces = {};
-let isWhitesTurn = true;
-
 const positionCallback = {
     handleChessPiece: function(x, y) {
         performMove(x, y);
@@ -167,7 +166,7 @@ export class pawn extends piece {
         const validMoves = [];
         for (const [captureX, captureY] of capturePositions) {
             const newX = x + captureX;
-            const newY = x + captureY;
+            const newY = y + captureY;
             const outOfBounds = newX < 0 || newX > 7 || newY < 0 || newY > 7;
             if (!outOfBounds) {
                 validMoves.push([newX, newY]);
@@ -330,12 +329,6 @@ export class king extends piece {
             [1, -1]
         ];
         this.movementPattern = movementPattern;
-        if (pieceType === 'K') {
-            whiteKing = [this.x, this.y];
-        }
-        if (pieceType === 'k') {
-            blackKing = [this.x, this.y];
-        }
         this.isMoved = false;
     }
 
@@ -366,129 +359,112 @@ export class king extends piece {
         // If no illegal move is encountered, return the legal moves
         return legalMoves;
     }
+
+    get getRochadeMoves() {
+        const leftRook = isWhitesTurn ? getPiece(0, 7) : getPiece(0, 0);
+        const rightRook = isWhitesTurn ? getPiece(7, 7) : getPiece(7, 0);
+    
+        const finalMoves = [];
+    
+        const checkTilesReachable = (start, end) => {
+            for (let i = start; i <= end; i++) {
+                const pieceBetweenRookAndKing = isWhitesTurn ? getPiece(i, 7) : getPiece(i, 0);
+                if (pieceBetweenRookAndKing) {
+                    return false;
+                }
+            }
+            return true;
+        };
+    
+        if (leftRook && !leftRook.isMoved && checkTilesReachable(1, 3)) {
+            const kingFinalPosition = isWhitesTurn ? [2, 7] : [2, 0];
+            rochadeTriggeredLeft = kingFinalPosition;
+            finalMoves.push(kingFinalPosition);
+        }
+    
+        if (rightRook && !rightRook.isMoved && checkTilesReachable(5, 6)) {
+            const kingFinalPosition = isWhitesTurn ? [6, 7] : [6, 0];
+            rochadeTriggeredRight = kingFinalPosition;
+            finalMoves.push(kingFinalPosition);
+        }
+    
+        return finalMoves;
+    }
+
     get allreadyMoved() {
         this.isMoved = true;
     }
 }
 
-function checkCheck(checkWhitesKing) {
-    // Überprüft, ob die gültigen Züge den gegnerischen König bedrohen.
-    let isInCheck = false;
-    const enemyKing = checkWhitesKing ? blackKing : whiteKing; // Referenz auf den gegnerischen König, da der Zug noch nicht beendet ist
-    Object.values(pieces).flat().forEach(piece => {
-        if (piece.isWhitePiece === checkWhitesKing) {
-            const enemyValidMoves = piece.possibleMoves;
-            isInCheck = enemyValidMoves.some(threateningPiece => threateningPiece[0] === enemyKing[0] && threateningPiece[1] === enemyKing[1]) || isInCheck;
-        }
-    });
-    return isInCheck;
-}
-
-function kingIsInCheck(x,y) {
-    let isInCheck = false;
-    const targetedPiece = getPiece(x, y);
-    Object.values(pieces).flat().forEach(piece => {
-        if (piece.isWhitePiece !== targetedPiece.isWhitePiece) {
-            const pawnPieceType = isWhitesTurn ? 'P' : 'p';
-            const enemyValidMoves = piece.pieceType.toLowerCase() === isWhitesTurn ? piece.attackPositions : piece.possibleMoves;
-            isInCheck = enemyValidMoves.some(threateningPiece => threateningPiece[0] === x && threateningPiece[1] === y) || isInCheck;
-        }
-    });
-    return isInCheck;
-}
+// <--- END OF CLASSES
 
 let rochadeTriggeredLeft = [];
 let rochadeTriggeredRight = [];
 
 function movesWhichWontLeadToCheck(x, y) {
-    let piece = getPiece(x, y);
-    const deletedPieces = [];
-    const possibleMoves = piece.possibleMoves;
-    const isKing = piece.pieceType.toLowerCase() === 'k';
+    const possibleMoves = getPiece(x, y).possibleMoves;
     const finalMoves = [];
-
-    for (const [possibleX, possibleY] of possibleMoves) {
-        // defines the new position of the Piece
-        const targetPiece = getPiece(possibleX, possibleY);
-        // saves all deleted pieces to restore them later
-        if (targetPiece && targetPiece.isWhitePiece !== isWhitesTurn) {
-            deletedPieces.push(targetPiece);
-        }
-
-        piece = piece.simulateMoveTo(possibleX, possibleY); // move To a possible Position
-
-        // You only want to restore the pieces which were hittable if they are not under attack (!targetPiece)
-        // Look, if opponent's piece (which is replaced by the King) is capable of being attacked, it's necessary due to King must be protected at any cost
-        if (!targetPiece || (isKing && kingIsInCheck(possibleX, possibleY))) {
-            for (const deletedPiece of deletedPieces) {
-                initPiece(deletedPiece.pieceType, deletedPiece.x, deletedPiece.y);
-                definePiece(deletedPiece, deletedPiece.x, deletedPiece.y);
+    const piece = getPiece(x, y) || false;
+    const kingPiece = isWhitesTurn ? kings.white : kings.black;
+    if (!piece) {
+        return finalMoves;
+    }
+    function getPossibleMoves() {
+        const possibleMoves = [];
+        
+        Object.values(pieces).flat().forEach(vPiece => {
+            if (vPiece.isWhitePiece !== piece.isWhitePiece) {
+                possibleMoves.push(...vPiece.possibleMoves);
             }
-        }
-        // if piece leads not to check or check mate push
-        // kingIsInCheck is used for King, because it has a different logic
-        // checkCkeck is used for all other pieces
-        if (isKing && !kingIsInCheck(possibleX, possibleY)) {
-            finalMoves.push([possibleX, possibleY]);
-        } else if  (!isKing && !checkCheck(!isWhitesTurn)) {
-            finalMoves.push([possibleX, possibleY]);
-        }
-        // remove simulated piece
-        deletePiece(possibleX, possibleY);
+        });
+        
+        return possibleMoves;
     }
 
-
-    // sets the selected Piece back to its original position
-    piece.simulateMoveTo(x, y);
-
-    // restore all deleted pieces
-    for (const deletedPiece of deletedPieces) {
-        definePiece(deletedPiece, deletedPiece.x, deletedPiece.y);
-        initPiece(deletedPiece.pieceType, deletedPiece.x, deletedPiece.y);
+    function checkIfInCheck(kingPosition) {
+        const possibleMoves = getPossibleMoves();
+        return !possibleMoves.some(v => v[0] === kingPosition[0] && v[1] === kingPosition[1]);
     }
-
-    const leftRook = isWhitesTurn ? getPiece(0, 7) : getPiece(0, 0);
-    const rightRook = isWhitesTurn ? getPiece(7, 7) : getPiece(7, 0);
-
-    // adds Moves if Rochade is possible
-    if (isKing && !piece.isMoved) {
-        if (leftRook && !leftRook.isMoved) {
-            let tilesReacheable = true;
-            for (let i = 1; i <= 3; i++) {
-                // gives the Piece of the tiles between the rook and the king (left side of the board)
-                const rightPieces = isWhitesTurn ? getPiece(i, 7) : getPiece(i, 0);
-                if (rightPieces) {
-                    tilesReacheable = false;
-                }
+    // returns true if the Piece at the startPosition can check if the piece moves to targetedPosition,
+    // it simulates if a move leads to check
+    function simulateMove(startPosition, targetedPosition) {
+        
+            let check = false;
+            // ----- save hitted piece -----
+            const deletedPiece = getPiece(targetedPosition[0], targetedPosition[1]);
+            // ----- simulate possible move -----
+            const playerPiece = piece.simulateMoveTo(targetedPosition[0], targetedPosition[1]);
+            // ----- check if simulated move leads to check -----
+            if (checkIfInCheck([kingPiece.x, kingPiece.y])) {
+                check = true;
             }
-            if (tilesReacheable) {
-                // const rookFinalPosition = isWhitesTurn ? [3, 7] : [3, 0];
-                const kingFinalPosition = isWhitesTurn ? [2, 7] : [2, 0];
-                rochadeTriggeredLeft = kingFinalPosition;
-                finalMoves.push(kingFinalPosition);
+            // ----- move attacking piece back -----
+            playerPiece.simulateMoveTo(startPosition[0], startPosition[1]);
+            // ----- restore hitted piece -----
+            if (deletedPiece) {
+                deletedPiece.simulateMoveTo(targetedPosition[0], targetedPosition[1]);
             }
+            return check;
+        
+    }
+    
+    possibleMoves.forEach(move => {
+        if (simulateMove([x, y], move)) {
+            finalMoves.push(move);
         }
+    });
 
-        if (rightRook && !rightRook.isMoved) {
-            let tilesReacheable = true;
-            for (let i = 5; i <= 6; i++) {
-                // gives the Piece of the tiles between the rook and the king (right side of the board)
-                const rightPieces = isWhitesTurn ? getPiece(i, 7) : getPiece(i, 0);
-                if (rightPieces) {
-                    tilesReacheable = false;
-                }
+    if (piece.pieceType.toLowerCase() === 'k') {
+        getPiece(x, y).getRochadeMoves.forEach(move => {
+                if (simulateMove([x, y], move)) {
+                finalMoves.push(move);
             }
-            if (tilesReacheable) {
-                // const rookFinalPosition = isWhitesTurn ? [5, 7] : [5, 0];
-                const kingFinalPosition = isWhitesTurn ? [6, 7] : [6, 0];
-                rochadeTriggeredRight = kingFinalPosition;
-                finalMoves.push(kingFinalPosition);
-            }
-        }
+        });
     }
 
     return finalMoves;
 }
+
 
 function selectPossibleMoves(possiblePositions) {
     for (const [x, y] of possiblePositions) {
@@ -507,48 +483,81 @@ function unselectMoves(previousPosition) {
 let previousMoves = [];
 let previousPiece = [];
 
+function performRochade(x,y) {
+    const leftRook = isWhitesTurn ? getPiece(0, 7) : getPiece(0, 0);
+    const rightRook = isWhitesTurn ? getPiece(7, 7) : getPiece(7, 0);
+
+    if (rochadeTriggeredLeft[0] === x && rochadeTriggeredLeft[1] === y) {
+        isWhitesTurn ? leftRook.moveTo(3, 7) : leftRook.moveTo(3, 0);
+    } else if (rochadeTriggeredRight[0] === x && rochadeTriggeredRight[1] === y) {
+        isWhitesTurn ? rightRook.moveTo(5, 7) : rightRook.moveTo(5, 0);
+    }
+            
+}
+function isCheckMate() {
+    Object.values(pieces).flat().forEach(piece => {
+        if (piece.isWhitePiece !== isWhitesTurn) {
+            if (movesWhichWontLeadToCheck(piece.x, piece.y).length === 0) {
+
+            } else {
+                return true;
+            }
+        }
+    })
+    return false;
+}
+
 function performMove(x, y) {
     const piece = getPiece(x, y);
-    // if a piece is encountered
+    const encounteredSelectedposition = previousMoves.some(([selectedX, selectedY]) => selectedX === x && selectedY === y);
     if (piece && piece.isWhitePiece === isWhitesTurn) {
+        // get All possible moves
         const selectedMoves = movesWhichWontLeadToCheck(x, y);
+        // ------------------
+        // update previous piece (also necessary for the else part)
         previousPiece = piece;
+        // ------------------
+        // unselect previous moves
         unselectMoves(previousMoves);
+        // ------------------
+        // select new moves
         selectPossibleMoves(selectedMoves);
+        // ------------------
+        // update previous moves
         previousMoves = selectedMoves;
-    }
-
-    if (previousMoves.some(([selectedX, selectedY]) => selectedX === x && selectedY === y)) {
+    } else
+    if (encounteredSelectedposition) {
+        // prevent Rochade, while moved
         if (previousPiece && (previousPiece.pieceType.toLowerCase() === 'k' || previousPiece.pieceType.toLowerCase() === 'r')) {
             previousPiece.allreadyMoved;
         }
+        // ------------------
         // performs Rochade
         if (rochadeTriggeredLeft || rochadeTriggeredRight) {
-            const leftRook = isWhitesTurn ? getPiece(0, 7) : getPiece(0, 0);
-            const rightRook = isWhitesTurn ? getPiece(7, 7) : getPiece(7, 0);
-
-            if (rochadeTriggeredLeft[0] === x && rochadeTriggeredLeft[1] === y && isWhitesTurn) {
-                leftRook.moveTo(3, 7);
-            } else if (rochadeTriggeredRight[0] === x && rochadeTriggeredRight[1] === y && isWhitesTurn) {
-                rightRook.moveTo(5, 7);
-            } 
-
-            if (rochadeTriggeredLeft[0] === x && rochadeTriggeredLeft[1] === y && !isWhitesTurn) {
-                leftRook.moveTo(3, 0);
-            } else if (rochadeTriggeredRight[0] === x && rochadeTriggeredRight[1] === y && !isWhitesTurn) {
-                rightRook.moveTo(5, 0);
-            } 
-            
+            performRochade(x,y);
         }
-
+        // ------------------
+        // Perform move
         previousPiece.moveTo(x, y);
+        // ------------------
+        // Update Kings position
+        if(previousPiece.pieceType === "K") {
+            kings.white = getPiece(x,y);
+        }
+        if (previousPiece.pieceType === "k") {
+            kings.black = getPiece(x,y);
+        }
+        // ------------------
+        // Prepare for next turn
         unselectMoves(previousMoves);
         isWhitesTurn = !isWhitesTurn;
         previousMoves = [];
         previousPiece = [];
-        rochadeTriggeredLeft = false;
-        rochadeTriggeredRight = false;
-    }
+        rochadeTriggeredLeft = null;
+        rochadeTriggeredRight = null;
+        // ------------------
+    } 
 }
 
 export default positionCallback;
+

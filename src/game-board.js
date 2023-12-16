@@ -9,6 +9,11 @@ import {
     queen
 } from './pieces.js';
 
+export const kings = {
+    white: king,
+    black: king,
+};
+
 export let chessBoard = [
     ["r", "p", null, null, null, null, "P", "R"],
     ["n", "p", null, null, null, null, "P", "N"],
@@ -19,6 +24,7 @@ export let chessBoard = [
     ['n', "p", null, null, null, null, "P", "N"],
     ["r", "p", null, null, null, null, "P", "R"]
 ];
+
 
 const validPieceCharacters = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const numSize = validPieceCharacters.length;
@@ -107,10 +113,13 @@ export function createPiece(piece, x, y) {
                 return new knight(piece, x, y);
             case 'b':
                 return new bishop(piece, x, y);
-            case 'k':
-                return new king(piece, x, y);
             case 'q':
                 return new queen(piece, x, y);
+        }
+        if (piece === 'K') {
+            kings.white = new king(piece, x, y);
+        } else if (piece === 'k') {
+            kings.black = new king(piece, x, y);
         }
     } else {
         return null;
@@ -119,3 +128,4 @@ export function createPiece(piece, x, y) {
 
 
 export default GameBoard;
+
